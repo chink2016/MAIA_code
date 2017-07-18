@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-
+# Cmd line for uncropped npz files: python -i your_mod21_file.hdf -o your_output_npz.npz -npz -c 
+# for cropped npz files, just get rid of the -c flag
 import os
 import numpy as np
 import sys
