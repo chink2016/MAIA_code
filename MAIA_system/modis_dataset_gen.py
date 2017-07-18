@@ -77,27 +77,27 @@ def ref_rad_attr(attributes, idx):
 	r_ro = attributes['reflectance_offsets'][idx]
 	return (r_sf,r_rs,r_ro)
 
-def main():
+def modis_dataset_generator(input_file, output_file,solar_zenith,band=-1,crop=True,npz=True,img=False):
 
 	global width
 	global height
-	parser = argparse.ArgumentParser(description='This will produce a cloud mask image in grayscale')
-	parser.add_argument('-i','--input',required=True,help='Input hdf file name')
-	parser.add_argument('-b','--band',default=-1,help='Input band number')
-	parser.add_argument('-s','--solar_zenith',required=True,help='Input solar_zenith file name')
-	parser.add_argument('-o','--output',required=True,help='Output image file name')
-	parser.add_argument('-c','--crop',action='store_false',help='If you want it to be true size')
-	parser.add_argument('-npz','--npz',action='store_true',help='Generates npz file')
-	parser.add_argument('-img','--img',action='store_true',help='Generates image file')
-	args = parser.parse_args()
+# 	parser = argparse.ArgumentParser(description='This will produce a cloud mask image in grayscale')
+# 	parser.add_argument('-i','--input',required=True,help='Input hdf file name')
+# 	parser.add_argument('-b','--band',default=-1,help='Input band number')
+# 	parser.add_argument('-s','--solar_zenith',required=True,help='Input solar_zenith file name')
+# 	parser.add_argument('-o','--output',required=True,help='Output image file name')
+# 	parser.add_argument('-c','--crop',action='store_false',help='If you want it to be true size')
+# 	parser.add_argument('-npz','--npz',action='store_true',help='Generates npz file')
+# 	parser.add_argument('-img','--img',action='store_true',help='Generates image file')
+# 	args = parser.parse_args()
 
-	hdf_file_name = args.input
-	output_file_name = args.output
+	hdf_file_name = input_file
+	output_file_name = output_file
 
 
 	hdf = SD(hdf_file_name)
 
-	band = int(args.band)
+	band = int(band)
 	if band != -1:
 		if(band_ds[band] == 0): 
 			print "\nUnavailable band number. Band numbers that are available: 1, 2, 4, 6, 7, 15, 16, 19, and 26"
@@ -105,7 +105,7 @@ def main():
 		band_extract(band)
 
 
-	solar_zenith_file = SD(args.solar_zenith)
+	solar_zenith_file = SD(solar_zenith)
 
 	solar_ds = solar_zenith_file.select('SolarZenith')[:,:]
 
@@ -132,7 +132,7 @@ def main():
 	blue_attr = ref_rad_attr(greenblue_ds_attr,blue_idx)
 
 
-	if(args.crop == False):
+	if(crop == False):
 		red_block = red_ds[red_idx]
 		green_block = greenblue_ds[green_idx]
 		blue_block = greenblue_ds[blue_idx]
@@ -159,13 +159,13 @@ def main():
 
 
 
-	if args.npz == True:
+	if npz == True:
 		reflectance_block = reflectance_block.ravel().reshape(height,width,order='F').ravel()
 		return npzgenerator(red_brf, green_brf, blue_brf, reflectance_block, output_file_name)
 
-	if args.img == True:
+	if img == True:
 		return imagegenerator(red_brf, green_brf, blue_brf, output_file_name, width, height)
 
 
-if __name__ == '__main__':
-	main()
+# if __name__ == '__main__':
+# 	main()
