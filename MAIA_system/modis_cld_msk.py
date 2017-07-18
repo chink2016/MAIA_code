@@ -35,11 +35,14 @@ def img_generator(cld_img, output_file_name, width, height, flag):
 
 	img.save(output_file_name)
 	img.show()
+	
+	return img
 
 def npzgenerator(cld_img, output_file_name):
 	cld_img = cld_img.ravel().reshape(height,width,order='F').ravel()
 	np.savez(output_file_name,cloud_mask = cloud_mask)
 
+	return cld_img
 
 def cloud_mask_generator(input_file,output_file,crop=False,npz=True,img=False,clr=False):
 
@@ -109,9 +112,9 @@ def cloud_mask_generator(input_file,output_file,crop=False,npz=True,img=False,cl
 	cld_img = (np.int_(cld_img) >> 1) & 0x03
 
 	if npz is True:
-		npzgenerator(cld_img,output_file_name)
+		return npzgenerator(cld_img,output_file_name)
 	if img is True:
-		img_generator(cld_img,output_file_name, w, h, color)
+		return img_generator(cld_img,output_file_name, w, h, color)
 
 # if __name__ == '__main__':
 # 	main()
