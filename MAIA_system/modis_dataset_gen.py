@@ -16,19 +16,10 @@ band_ds = 	[0	,	{'ds_name': 'EV_250_Aggr1km_RefSB', 'mrange': 17730},	{'ds_name'
 
 colors = {'Red':1, 'Green':4, 'Blue':3}
 
-width = 2030
-height = 1354
-
-w_l = width/2 - 200
-w_r = w_l + 400
-
-h_l = height/2 - 200
-h_r = h_l + 400
-
 def imagegenerator(red_block, green_block, blue_block, output_file_name, width, height):
 
 	band_img = Image.new('RGB',(width,height))
-	band_img.putdata(zip(red_block,green_block,blue_block))
+	band_img.putdata(zip(np.int32(red_block),np.int32(green_block),np.int32(blue_block)))
 	band_img.save(output_file_name)
 	band_img.show()
 	return band_img
@@ -130,6 +121,16 @@ def modis_dataset_generator(input_file, output_file,solar_zenith,band=-1,crop=Tr
 	red_attr = ref_rad_attr(red_ds_attr,red_idx)
 	green_attr = ref_rad_attr(greenblue_ds_attr,green_idx)
 	blue_attr = ref_rad_attr(greenblue_ds_attr,blue_idx)
+
+	
+	width = len(red_ds[red_idx])
+	height = len(red_ds[red_idx][0])
+
+	w_l = width/2 - 200
+	w_r = w_l + 400
+
+	h_l = height/2 - 200
+	h_r = h_l + 400
 
 
 	if(crop == False):
