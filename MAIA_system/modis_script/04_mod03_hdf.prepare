@@ -1,0 +1,256 @@
+#! /bin/csh
+# DESCRIPTION:
+#   this script
+#   (1) Checks the overlapped fisrtblock and lastblock of each mod03 hdf file in 
+#         new mod03 file directry against the target_start_b and target_end_b,
+#   (2) The mod03_lat/lon are umpped from mod03 hdf file and combined to a single file;
+#       the file is then moved to the hdfdata directory.
+#       NOTE: the juliandate is from mod03 hdf file, not the v2.???.info file.
+#   (3) Generate the v3.???.info file
+#                                       v3.???.info
+#       -----------------------------------------------------------------------------------------------------------
+#       -  pathnumber orbit misr_dump_start_b misr_dump_end_b misr_cal_start_img misr_cal_end_img                 -
+#                      overlap_first_img overlap_lastimg juliandadate date modtime cal_start_img cal_end_img      -
+#       -  048 004783 030 083 033 081 057 072 A2000315 11/10/2000 1940 057 072                                    -
+#       -  000 000000 000 000 000 000 000 000 00000000 0000000000 0000 000 000                                    -
+#       -----------------------------------------------------------------------------------------------------------
+#   (4) the unused (non-valid) mod03 files are moved to the new.modis/non_valid_mod03 directory, and
+#      can be deleted thereafter. 
+#   (6) order the missed mod03 files and re-run the script
+#
+# Update information:
+#   last update: Feb 15, 2008
+
+#set environment
+set exehost=${HOME}/MVM/
+set destinationdir="/mnt/c/scratch/sciteam/dfu3/MODIS.data/"
+set misrAGPfiledir = "/mnt/c/scratch/sciteam/dfu3/data/AGP/"
+# exe dirs
+set exefindmodisorbit=${exehost}"codes/path.orbit.tool/bin/findmodisorbit.exe"
+set exeorbitTopathdate=${exehost}"codes/path.orbit.tool/bin/orbitTopathdate.exe"
+set exejuliandateTodate=${exehost}"codes/path.orbit.tool/bin/juliandateTodate.exe"
+set exeoverlapblock=${exehost}"codes/modisrepro/overlapblock/bin/overlapblock.exe"
+
+if ( $#argv != 2 ) then
+    echo "  STOP!"
+    echo "      usage: this_script v2.???.info new_mod03_file_dir"
+    exit
+endif
+
+set v2infofile=$1
+set newmod03filedir=$2"/"
+
+#check the validity of the v2.???.info file
+set str=(`sed -n 1p";"1q $v2infofile`)
+set filetitle=$str
+set fileversion=`echo $str | cut -d "." -f1-1`
+if ( $fileversion != v2 ) then
+    echo "STOP!!!!!"
+    echo "The pathorbittime file is wrong!"
+    echo "v2.???.info is required."
+    exit
+endif
+
+#=============================================================================================
+# part 1: ======================== check each mod03file in the new.modis/mod03 directory======
+set mod03files=`ls --color=never ${newmod03filedir}`
+set ifile=0
+while ( $ifile < $#mod03files )
+    set ifile = `expr $ifile + 1`
+    if( $#mod03files == 1) then
+        set mod03file=$mod03files
+    else
+        set mod03file=$mod03files[$ifile]
+    endif
+    set fileheader=`echo $mod03file | cut -d '.' -f1-1`
+    if ($fileheader != "MOD03" ) continue
+    
+    # (1). get this mod03file's orbit,path, juliandate, overlap_firstimg and overlap_lastimg   
+    set mod03orbit=`$exefindmodisorbit ${newmod03filedir}${mod03file}`
+    set output=`$exeorbitTopathdate $mod03orbit`
+    set mod03pathnumber=$output[1]
+    echo "    check:" $mod03pathnumber $mod03orbit $mod03file
+    set mod03juliandate=`echo $mod03file | cut -d '.' -f2-2`
+    set misrAGPFile=${misrAGPfiledir}MISR_AM1_AGP_P${mod03pathnumber}_F01_24.hdf
+    if ( ! -f $misrAGPFile ) then
+        echo $misrAGPFile does not exist!
+        exit
+    endif
+    set output=`${exeoverlapblock} ${newmod03filedir}${mod03file} ${misrAGPFile} | grep overlap_firstblock`
+    set overlap_firstblock=`echo $output | cut -d " " -f1-1 | cut -d "=" -f2-2`
+    set overlap_lastblock=`echo $output | cut -d " " -f2-2 | cut -d "=" -f2-2`
+    if ( $overlap_firstblock == 0 || $overlap_lastblock == 0 ) continue  # next mod03 file
+    set overlap_lastimg = `expr \( \( $overlap_lastblock + 1 \) / 3 \) \* 3 `
+    set overlap_firstimg = ` expr \( \( $overlap_firstblock + 1 \) / 3 \) \* 3 `
+    if ( $overlap_firstimg <= 10 ) then
+        set overlap_firstimg=00$overlap_firstimg
+    else if ( $overlap_firstimg < 100 ) then
+        set overlap_firstimg=0$overlap_firstimg
+    endif
+    if ( $overlap_lastimg  <= 10 ) then
+        set overlap_lastimg=00$overlap_lastimg
+    else if ( $overlap_lastimg < 100 ) then 
+        set overlap_lastimg=0$overlap_lastimg
+    endif
+    
+
+    # (2). check against the v2.???.info file
+    set totallines = `grep "$mod03pathnumber $mod03orbit " $v2infofile | wc -l` 
+    set line=0
+    while ( $line < $totallines )
+        set line = `expr $line + 1 `
+        set str=(`grep "$mod03pathnumber $mod03orbit " $v2infofile \
+                                | sed -n ${line}p";"${line}q `)
+        set v2path=$str[1]
+        set v2orbit=$str[2]
+        set comdate=$str[4]
+        set year=`echo $comdate | cut -d '/' -f3-3`
+   
+        if ( $mod03pathnumber != $v2path || $mod03orbit != $v2orbit ) continue        
+    
+        # check [overlap_firstimg, overlap_lastimg] if overlaps within [009, 162]
+        set val_overlap_firstimg=` expr $overlap_firstimg + 0 `
+        set val_overlap_lastimg=` expr $overlap_lastimg + 0 `
+        if ( $val_overlap_firstimg < 9 || $val_overlap_lastimg > 162 ) then
+            continue   # check the next line
+        endif
+
+        # ----- OK! So far, this mod03 file is a valid one
+        set destination=${destinationdir}/${year}/${mod03pathnumber}.${mod03orbit}/
+        set mod03modtime=`echo $mod03file | cut -d "." -f3-3`
+        set mod03_final_file=${destination}MOD03.${mod03pathnumber}.${mod03orbit}.${mod03juliandate}.${mod03modtime}.hdf
+
+        if ( -e $mod03_final_file ) continue 
+        if( ! -d $destination ) mkdir -p $destination
+        echo move ${newmod03filedir}${mod03file} $mod03_final_file
+        mv ${newmod03filedir}${mod03file} $mod03_final_file 
+            
+    end
+end
+
+#=====================================================================================================
+# part 2: =========================== geneate v3.???.info file =======================================
+set filetrailer=`echo $filetitle | cut -d '.' -f2-3`
+echo "v3."$filetrailer
+set line=1
+set totalline = `wc -l $v2infofile | cut -d ' ' -f1-1`
+set totalline = `expr $totalline - 1`
+while ( $line < $totalline )
+    set line = `expr $line + 1`
+    set str=(`sed -n ${line}p";"${line}q $v2infofile`)
+    set v2pathnumber=$str[1]
+    set v2orbit=$str[2]
+    set v2juliandate=$str[3]
+    set v2date=$str[4]
+
+    # go through each mod03 file under
+    # MODIS.hdfdata/${v2pathnumber}/${v2pathnumber}"."${v2orbit}/
+    
+    # (1). if the directory does not exist
+    set year=`echo $v2date | cut -d '/' -f3-3`
+    
+    set destination=${destinationdir}/${year}/${v2pathnumber}"."${v2orbit}/
+    if( ! -d ${destination}) then
+        echo "================> no mod03file for:" $v2pathnumber $v2orbit $v2juliandate $v2date "############"
+        continue # check the next line
+    endif
+
+    #(2). or if the directory is empty
+    set curdir=`pwd`
+    cd ${destination}
+    set files=`ls --color=never MOD03.*.hdf`
+    cd $curdir
+    if ( $#files == 0 ) then
+        echo "================> no mod03file for:" $v2pathnumber $v2orbit $v2juliandate $v2date "############"
+        continue
+    endif
+    
+    # (3) check the mod03 file in the directory, if its [overlap_fisrt_img,overlap_last_img] 
+    #     is within [009, 162], write the file information to the v3.???.info file
+    set flag=0
+    set n=0
+    while ( $n < $#files )
+        set n = `expr $n + 1`
+        if ( $#files == 1 ) then
+            set mod03file=$files
+        else
+            set mod03file=$files[$n]
+        endif
+ 
+        set mod03orbit=`$exefindmodisorbit ${destination}/${mod03file}`
+        set output=`$exeorbitTopathdate $mod03orbit`
+        set mod03pathnumber=$output[1]
+        set misrAGPFile=${misrAGPfiledir}MISR_AM1_AGP_P${mod03pathnumber}_F01_24.hdf
+        if ( ! -f $misrAGPFile ) then
+            echo $misrAGPFile does not exist!
+            exit
+        endif
+        
+        set output=`${exeoverlapblock} ${destination}/${mod03file} ${misrAGPFile} | grep overlap_firstblock`
+        set overlap_firstblock=`echo $output | cut -d " " -f1-1 | cut -d "=" -f2-2`
+        set overlap_lastblock=`echo $output | cut -d " " -f2-2 | cut -d "=" -f2-2`
+        if ( $overlap_firstblock == 0 || $overlap_lastblock == 0 ) continue  # next mod03 file
+        set overlap_lastimg = `expr \( \( $overlap_lastblock + 1 \) / 3 \) \* 3 `
+        set overlap_firstimg = ` expr \( \( $overlap_firstblock + 1 \) / 3 \) \* 3 `
+
+        # set the cal_start_img and cal_end_img
+        set cal_start_img=0
+        set cal_end_img=0
+        set val_overlap_firstimg=` expr $overlap_firstimg + 0 `
+        set val_overlap_lastimg=`expr $overlap_lastimg + 0 `
+        if ( $val_overlap_firstimg < 9 && $val_overlap_lastimg >= 9 ) then
+            set cal_start_img=9
+        else if ( $val_overlap_firstimg >= 9 && $val_overlap_firstimg <= 162 ) then
+            set cal_start_img=$overlap_firstimg
+        endif
+        
+        if ( $cal_start_img != 0 ) then
+            if ( $val_overlap_lastimg <= 162 ) then
+                set cal_end_img=$overlap_lastimg
+            else
+                set cal_end_img=162
+            endif
+        endif
+        if ( $cal_start_img == 0 || $cal_end_img == 0 ) then
+            continue  # check the next file
+        endif
+        set flag=1
+        
+        set mod03juliandate=`echo $mod03file | cut -d "." -f4-4`
+        set mod03date=`$exejuliandateTodate $mod03juliandate`
+        set mod03modtime=`echo $mod03file | cut -d "." -f5-5`
+        
+        if ( $overlap_firstimg <= 10 ) then
+            set overlap_firstimg=00$overlap_firstimg
+        else if ( $overlap_firstimg < 100 ) then
+            set overlap_firstimg=0$overlap_firstimg
+        endif
+        if ( $overlap_lastimg  <= 10 ) then
+            set overlap_lastimg=00$overlap_lastimg
+        else if ( $overlap_lastimg < 100 ) then 
+            set overlap_lastimg=0$overlap_lastimg
+        endif
+ 
+        if ( $cal_start_img <= 10 ) then
+            set cal_start_img=00$cal_start_img
+        else if ( $cal_start_img < 100 ) then
+            set cal_start_img=0$cal_start_img
+        endif
+        if ( $cal_end_img  <= 10 ) then
+            set cal_end_img=00$cal_end_img
+        else if ( $cal_end_img < 100 ) then 
+            set cal_end_img=0$cal_end_img
+        endif
+ 
+        echo $v2pathnumber $v2orbit $overlap_firstimg $overlap_lastimg $mod03juliandate $mod03date $mod03modtime $cal_start_img $cal_end_img
+    end
+
+    # if no file in the directory overlapped within the [009,162]
+    if ( flag == 0 ) then
+        echo "================> no mod03file for:" $v2pathnumber $v2orbit $v2juliandate $v2date "############"
+    endif
+end
+
+echo 000 000000 000 000 00000000 0000000000 0000 000 000
+
+exit
