@@ -9,7 +9,6 @@ from PIL import Image
 
 
 def img_generator(cld_img, output_file_name, width, height, flag):
-	cld_img = cld_img.ravel().reshape(height,width,order='F').ravel()
 	img = Image.new(flag,(width,height))
 	if flag == "L":
 		cld_img[cld_img == 0] = max(0x03*86, 0xff)
@@ -39,9 +38,7 @@ def img_generator(cld_img, output_file_name, width, height, flag):
 	return img
 
 def npzgenerator(cld_img, output_file_name):
-	cld_img = cld_img.ravel().reshape(height,width,order='F').ravel()
 	np.savez(output_file_name,cloud_mask = cloud_mask)
-
 	return cld_img
 
 def cloud_mask_generator(input_file,output_file,crop=False,npz=True,img=False,clr=False):
@@ -110,7 +107,8 @@ def cloud_mask_generator(input_file,output_file,crop=False,npz=True,img=False,cl
 			
 	cld_img = cld_ds_0
 	cld_img = (np.int_(cld_img) >> 1) & 0x03
-
+	cld_img = cld_img.ravel().reshape(h,w,order='F').ravel()
+	
 	if npz is True:
 		return npzgenerator(cld_img,output_file_name)
 	if img is True:
