@@ -38,7 +38,7 @@ def img_generator(cld_img, output_file_name, width, height, flag):
 	return img
 
 def npzgenerator(cld_img, output_file_name):
-	np.savez(output_file_name,cloud_mask = cloud_mask)
+	np.savez(output_file_name,cloud_mask = cld_img)
 	return cld_img
 
 def cloud_mask_generator(input_file,output_file,crop=False,npz=True,img=False,clr=False):
