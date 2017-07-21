@@ -1,1 +1,7 @@
 #! /bin/csh
+# DESCRIPTION:
+#   this script
+#   will read each file from MOD21 and MOD06 to generate
+#   the  appropriate dataset
+#
+#

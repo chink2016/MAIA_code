@@ -28,18 +28,18 @@ def SVM(training_data,training_labels,pca=False):
     return
 
 #arr = #assume the array is obtained
-modis_dataset_generator("MOD021KM.A2004026.1230.006.2014218105922.hdf","output1.npz","MOD03.A2004026.1230.006.2012274025923.hdf")
-curr_data = np.load("output1.npz")
+#modis_dataset_generator("MOD021KM.A2004026.1230.006.2014218105922.hdf","output1.npz","MOD03.A2004026.1230.006.2012274025923.hdf")
+curr_data = np.load("sample10.npz")
 
 curr_image = curr_data["arr_0"]
 
-labels_file = cloud_mask_generator("MOD06_L2.A2004026.1230.006.2014332063358.hdf","label_output.npz",True)
-labels_dict = np.load("label_output.npz")
+#labels_file = cloud_mask_generator("MOD06_L2.A2004026.1230.006.2014332063358.hdf","label_output.npz",True)
+labels_dict = np.load("mask10.npz")
 image_labels = labels_dict["cloud_mask"]
 
-#gaussian_naive_bayes(curr_image,image_labels)
-#SVM(curr_image,image_labels)
-#SVM(curr_image,image_labels,True)
+gaussian_naive_bayes(curr_image,image_labels)
+SVM(curr_image,image_labels)
+SVM(curr_image,image_labels,True)
 
 #no_components = 2
 
